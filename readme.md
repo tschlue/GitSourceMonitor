@@ -16,7 +16,7 @@ To create a .smproj file containing the commits for your git repository, do the 
 <li>Add the executable to your path (or invoke using the full path on the command line).</li>
 <li>Open up command line, and browse to the git repository you want to process.</li>
 <li>Make sure you do not have any uncommitted modifications in the working tree, since the tool needs to check out each commit in turn!</li>
-<li>Run GitSourceMonitor "branchname" "outputfilename.smproj", where branchname tells the git branch to process, and outputfilename.smproj specifies the SourceMonitor project file to output.</li>
+<li>Run GitSourceMonitor "branchname" "outputfileprefix", where branchname tells the git branch to process, and outputfileprefic specifies the SourceMonitor project (<outputfileprefix>_<branchname>.smproj) file to output.</li>
 <li>Done. After the tool finishes, you can open the .smproj file in SourceMonitor.</li>
 </ol>
 

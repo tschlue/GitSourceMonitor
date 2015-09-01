@@ -22,6 +22,8 @@ namespace GitSourceMonitor
 
         static void Main(string[] args)
         {
+            List<string> commits = new List<string>();
+
             if (args.Length == 0)
             {
                 Console.WriteLine("Usage: GitSourceMonitor <branchname> [outputfilename]");
@@ -33,24 +35,35 @@ namespace GitSourceMonitor
 
             // Run 'git log' to get all the commits in the repository.
             // Assuming the tool is run with cwd inside the git repository.
-            ProcessStartInfo ps = new ProcessStartInfo();
-            ps.CreateNoWindow = true; // Bug: For some reason, when invoking git, it creates a window even if this is true.
-            ps.FileName = "git";
+            ProcessStartInfo startInfo = new ProcessStartInfo();
+            startInfo.FileName = "git";
             // Use a special '|||||' as a delimiter so that we can split the results easily below.
-            ps.Arguments = "log " + args[0] + "  --format=\"%H|||||%s|||||%at\" --no-color --no-merges > gitsm_temp_file.txt";
-            Process p = Process.Start(ps);
-            p.WaitForExit();
+            startInfo.Arguments = "log " + args[0] + " --format=\"%H|||||%s|||||%at\" --no-color --no-merges";
+            startInfo.RedirectStandardOutput = true;
+            startInfo.RedirectStandardError = true;
+            startInfo.UseShellExecute = false;
+            startInfo.CreateNoWindow = true; // Bug: For some reason, when invoking git, it creates a window even if this is true.
 
-            string outputProjectFile = args.Length >= 2 ? args[1] : "GitSourceMonitorProject.smproj";
-            // Read the commits from the output file.
-            List<string> commits = new List<string>();
-            using (TextReader reader = File.OpenText("gitsm_temp_file.txt"))
+            Process proc = Process.Start(startInfo);
+
+            try
             {
-                string line = reader.ReadToEnd();
-                commits.AddRange(line.Split('\n').ToList());
+                proc.Start();
+                while( !proc.StandardOutput.EndOfStream )
+                {
+                    string line = proc.StandardOutput.ReadLine();
+                    commits.AddRange(line.Split('\n').ToList());
+                }
+                proc.WaitForExit();
             }
-            // Don't leave temp files lying around.
-            File.Delete("gitsm_temp_file.txt");
+            catch(Exception e)
+            {
+                throw;
+            }
+
+            string outputProjectFile = args.Length >= 2 ? args[1] : "GitSourceMonitorProject";
+            outputProjectFile += "_" + args[0] + ".smproj";
+
 
             // Add checkpoints from oldest to newest. The log file had from newest to oldest.
             commits.Reverse();
@@ -91,16 +104,20 @@ namespace GitSourceMonitor
 
                 // Check out the commit so that SourceMonitor can process it.
                 Console.WriteLine("Processing commit (" + (n++) + "/" + commits.Count + "): " + commitTimeString + ": " + message);
-                ps = new ProcessStartInfo();
-                ps.CreateNoWindow = true; // Bug: For some reason, when invoking git, it creates a window even if this is true.
-                ps.FileName = "git";
-                ps.Arguments = "checkout " + commitHash;
-                p = Process.Start(ps);
-                p.WaitForExit();
+                startInfo = new ProcessStartInfo();
+                startInfo.FileName = "git";
+                startInfo.Arguments = "checkout " + commitHash;
+                startInfo.RedirectStandardOutput = true;
+                startInfo.RedirectStandardError = true;
+                startInfo.UseShellExecute = false;
+                startInfo.CreateNoWindow = true; // Bug: For some reason, when invoking git, it creates a window even if this is true.
+                proc = Process.Start(startInfo);
+                proc.WaitForExit();
+                
 
                 // Create the command file for SourceMonitor to process. The new file will instruct SourceMonitor
                 // to create a new checkpoint to the project.
-                using (TextWriter writer = File.CreateText("gitsm_temp_checkpoint.xml"))
+                using( TextWriter writer = File.CreateText("gitsm_temp_checkpoint.xml") )
                 {
                     writer.Write("<?xml version=\"1.0\" encoding=\"UTF-8\" ?>\n\n" +
                              "<sourcemonitor_commands>\n" +
@@ -125,12 +142,15 @@ namespace GitSourceMonitor
                 }
 
                 // Run SourceMonitor.
-                ps = new ProcessStartInfo();
-                ps.CreateNoWindow = true;
-                ps.FileName = "SourceMonitor";
-                ps.Arguments = "/C gitsm_temp_checkpoint.xml";
-                p = Process.Start(ps);
-                p.WaitForExit();
+                startInfo = new ProcessStartInfo();
+                startInfo.FileName = @"C:\Program Files (x86)\SourceMonitor\SourceMonitor.exe";
+                startInfo.Arguments = "/C gitsm_temp_checkpoint.xml";
+                startInfo.RedirectStandardOutput = true;
+                startInfo.RedirectStandardError = true;
+                startInfo.UseShellExecute = false;
+                startInfo.CreateNoWindow = true; // Bug: For some reason, when invoking git, it creates a window even if this is true.
+                proc = Process.Start(startInfo);
+                proc.WaitForExit();
 
                 File.SetCreationTime(outputProjectFile, commitTime);
             }
